@@ -11,13 +11,21 @@ const pvDechetSchema = new mongoose.Schema(
     Id_User: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     Nature_Dechet: { type: mongoose.Schema.Types.ObjectId, ref: "DechetModel", required: true },
     Type_Dechet: { type: Number, required: true },
+    Service_Emetteur:{type:String,required: true},
     Designation: { type: String, required: true },
+    Quantite:{type:Number, required:true},
     Num_lot: { type: Number, max: 99999, required: true },
     Motif_Rejet: { type: String, required: true },
     Commentaire: { type: String, required: true },
     statut: { type: String, enum: ["valider", "enregistrer"], required: true },
+    updateCount: {
+      type: Number,
+      default: 0
+    }
   },
-  { timestamps: true } // ✅ This automatically adds createdAt & updatedAt
+  { timestamps: true }, // ✅ This automatically adds createdAt & updatedAt
+  
+  
 );
 
 // Create the Model

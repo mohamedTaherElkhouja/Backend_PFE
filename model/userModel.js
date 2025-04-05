@@ -25,6 +25,17 @@ const userSchema = new mongoose.Schema({
     type:mongoose.Schema.Types.ObjectId,
     ref:"Role"
     
+  },
+  verificationToken:{
+    type:String
+
+  },
+  resetToken:{
+    type:String
+
+  },
+  resetTokenExpire:{
+    type:Date
   }
 });
 userSchema.pre('save',async function(next){

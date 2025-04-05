@@ -7,4 +7,5 @@ router.post('/addDechet', dechetController.addDechet);
 router.get('/getAllDechets', dechetController.getAllDechets);
 router.get('/getDechetById:id', dechetController.getDechetById);
 
+
 module.exports = router; 
