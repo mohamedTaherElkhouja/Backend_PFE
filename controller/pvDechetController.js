@@ -219,3 +219,79 @@ module.exports.UpdatePvDechet = async (req, res) => {
         return res.status(500).json({ message: "Server error", error: error.message });
     }
 };
+module.exports.getPvDechetById=async(req,res)=>{
+    const {pvDechetId}=req.params
+    try{
+        const dechet=await PvDechet.findById(pvDechetId)
+        if(!dechet){
+            return res.status(404).json({message:"error not found"})
+            
+        }
+        res.json(dechet)
+
+    }
+    catch(error){
+        console.error(error);
+        return res.status(500).json({ message: "Server error", error: error.message });
+
+
+    }
+};
+module.exports.modifyPvDechet = async (req, res) => {
+    const { pvDechetId } = req.params; 
+    const { 
+        Date_Creation, 
+        Nature_Dechet, 
+        Type_Dechet, 
+        Service_Emetteur, 
+        Designation, 
+        Quantite, 
+        Num_lot, 
+        Motif_Rejet, 
+        Commentaire 
+    } = req.body; 
+
+    try {
+        
+        const dechet = await PvDechet.findById(pvDechetId);
+
+        
+        if (!dechet) {
+            return res.status(404).json({ message: "PvDechet not found" });
+        }
+
+        
+        if (dechet.statut === "valider") {
+            return res.status(400).json({ message: "This dechet has already been validated and cannot be modified" });
+        }
+
+        
+        if (Date_Creation) {
+            const [day, month, year] = Date_Creation.split('-');
+            dechet.Date_Creation = new Date(`${year}-${month}-${day}`);
+        }
+
+        if (Nature_Dechet) dechet.Nature_Dechet = Nature_Dechet;
+        if (Type_Dechet) dechet.Type_Dechet = Type_Dechet;
+        if (Service_Emetteur) dechet.Service_Emetteur = Service_Emetteur;
+        if (Designation) dechet.Designation = Designation;
+        if (Quantite) dechet.Quantite = Quantite;
+        if (Num_lot) dechet.Num_lot = Num_lot;
+        if (Motif_Rejet) dechet.Motif_Rejet = Motif_Rejet;
+        if (Commentaire) dechet.Commentaire = Commentaire;
+
+        
+        dechet.updatedAt = Date.now();
+        dechet.updateCount = (dechet.updateCount || 0) + 1;
+
+        
+        await dechet.save();
+
+        
+        res.status(200).json({ message: "PvDechet modified successfully", data: dechet });
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
