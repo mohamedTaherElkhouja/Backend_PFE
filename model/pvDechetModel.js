@@ -9,7 +9,7 @@ const pvDechetSchema = new mongoose.Schema(
   {
     Date_Creation: { type: Date, required: true },
     Id_User: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    Nature_Dechet: { type: mongoose.Schema.Types.ObjectId, ref: "DechetModel", required: true },
+    Nature_Dechet: { type: mongoose.Schema.Types.ObjectId, ref: "Categorie", required: true },
     Type_Dechet: { type: Number, required: true },
     Service_Emetteur:{type:String,required: true},
     Designation: { type: String, required: true },

@@ -32,7 +32,7 @@ app.use("/role", routerRole);
 app.use("/dechet", routerDechet);
 app.use("/pvDechet", routerPvDechet);
 app.use("/admin", routerAdmin);
-app.use("/admin", routerAuthAdmin);
+app.use("/adminAuth", routerAuthAdmin);
 
 // Route de base
 app.get('/', (req, res) => {
