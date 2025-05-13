@@ -21,7 +21,15 @@ const pvDechetSchema = new mongoose.Schema(
     updateCount: {
       type: Number,
       default: 0
-    }
+    },
+    AQ_Commentaire: {type:String},
+    AQ_Quantite_Avant:{type: Number},
+    AQ_Quantite_Apres: {type:Number},
+    AQ_Validated: { type: Boolean, default: false },
+    HSE_Commentaire: {type : String},
+    HSE_Validated:{type: Boolean, default: false},  
+
+
   },
   { timestamps: true }, // ✅ This automatically adds createdAt & updatedAt
   
