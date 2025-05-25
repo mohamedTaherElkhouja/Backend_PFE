@@ -9,18 +9,16 @@ const adminSchema = new mongoose.Schema(
         },
         password: { 
             type: String, 
-            required: true 
+            required: true, 
+            
         },
         resetToken: { 
             type: String 
-
         },
         resetTokenExpire: {
              type: Date 
-            }
+        }
     }
-    
-    
 )
 adminSchema.pre('save',async function(next){
     const admin = this;
@@ -32,9 +30,7 @@ adminSchema.pre('save',async function(next){
            next();
        }catch(err){
            return next (err);
-
        }
-
     }else{
        return next();
     }

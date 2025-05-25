@@ -2,19 +2,21 @@ const User = require('../model/userModel.js');
 const Admin = require('../model/adminModel.js')
 const PvDechet= require ('../model/pvDechetModel.js');
 const bcrypt=  require ('bcrypt');
-const admin = require('../model/adminModel.js');
+
 
 module.exports.createAdmin = async(req, res) => {
     try {
       const { email, password } = req.body;
       const hashed = await bcrypt.hash(password, 10);
       const admin = new Admin({ email, password: hashed });
+      
       await admin.save();
       res.status(201).json({ message: 'Utilisateur créé avec succès', admin });
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   };
+
 
 module.exports.getAllUsers = async (req, res) => {
   try {
@@ -58,26 +60,29 @@ module.exports.countUsers = async (req, res) => {
     }
   };
 module.exports.getAllPvHistory = async (req, res) => {
-    try {
-      const { statut, userId } = req.query;
-  
-      const filters = {};
-      if (statut) filters.statut = statut;
-      if (userId) filters.Id_User = userId; // 🔄 Corrigé ici
-  
-      console.log("Applying filters:", filters);
-  
-      const pvList = await PvDechet.find(filters)
-        .populate('Id_User').populate("Nature_Dechet") // 🔄 Corrigé ici
-        .sort({ createdAt: -1 });
-  
-      res.json(pvList);
-    } catch (err) {
-      console.error("Erreur dans getAllPvHistory:", err);
-      res.status(500).json({ message: 'Erreur lors de la récupération de l’historique', error: err.message });
-    }
-  };
-  
+  try {
+    const { statut, userId } = req.query;
+    const AQ_ROLE_ID = "67ccb0a866312e8af97a1f3e";
+    const HSE_ROLE_ID = "67ccb0ae66312e8af97a1f41";
+    const aqUser = await User.findOne({ roleId: AQ_ROLE_ID });
+    const hseUser = await User.findOne({ roleId: HSE_ROLE_ID });
+
+    const filters = {};
+    if (statut) filters.statut = statut;
+    if (userId) filters.Id_User = userId;
+
+    const pvList = await PvDechet.find(filters)
+      .populate('Id_User', 'name firstName')
+      .populate('Nature_Dechet')
+      .sort({ createdAt: -1 });
+
+    // Send AQ and HSE user info with the PV list
+    res.json({ pvList, aqUser, hseUser });
+  } catch (err) {
+    console.error("Erreur dans getAllPvHistory:", err);
+    res.status(500).json({ message: 'Erreur lors de la récupération de l’historique', error: err.message });
+  }
+};
   
   module.exports.getUserById = async (req, res) => {
     try {
@@ -129,24 +134,65 @@ module.exports.countPvDechet = async (req, res) => {
 }
 
 module.exports.UpdateProfileAdmin = async (req, res) => {
-  const {adminId}=req.params
-  try{
-     const admin = await Admin.findById(adminId);
-     if(!admin){
-        return res.status(404).json({message:"admin not found"})
-     }
-      const {email,password}=req.body
-      if(email){
-        admin.email=email
+  const { adminId } = req.params;
+  try {
+    const admin = await Admin.findById(adminId);
+    if (!admin) {
+      return res.status(404).json({ message: "admin not found" });
+    }
+    const { email, password, confirmPassword } = req.body;
+
+    if (email) {
+      admin.email = email;
+    }
+    if (password) {
+      if (!confirmPassword) {
+        return res.status(400).json({ message: "confirmPassword is required" });
       }
-      if(password){
-        const hashed = await bcrypt.hash(password, 10);
-        admin.password=hashed
+      if (password !== confirmPassword) {
+        return res.status(400).json({ message: "Passwords do not match" });
       }
-      await admin.save()
-      res.status(200).json({message:"admin updated successfully"}) 
-  }catch(err){
-    console.log(err)
+      const hashed = await bcrypt.hash(password, 10);
+      admin.password = hashed;
+    }
+    await admin.save();
+    res.status(200).json({ message: "admin updated successfully" });
+  } catch (err) {
+    console.log(err);
     res.status(500).json({ message: "Error in server" });
   }
 }
+
+module.exports.createUser = async (req, res) => {
+  try {
+    const { name, email, password , service } = req.body;
+    // Accept both firstName and firstname
+    const firstName = req.body.firstName || req.body.firstname;
+    const roleId = req.body.roleId || req.query.roleId;
+
+    if (!firstName) {
+      return res.status(400).json({ message: 'firstName is required' });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+    // Hash the password
+    const hashed = await bcrypt.hash(password, 10);
+    // Create new user
+    const user = new User({
+      name,
+      firstName, // Always use the correct field name for the model
+      email,
+      password: hashed,
+      roleId,
+      service
+    });
+    await user.save();
+    res.status(201).json({ message: 'Utilisateur créé avec succès', user });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

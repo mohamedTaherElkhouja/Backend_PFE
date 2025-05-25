@@ -73,7 +73,7 @@ module.exports.forgetPassword = async (req, res) => {
         const expired = new Date(now.getTime() + 3600000); // Token expires in 1 hour
         user.resetToken = token;
         user.resetTokenExpire = expired;
-        await user.save();
+        await user.save({ validateBeforeSave: false });
 
         const transporter = nodemailer.createTransport({
             service: "Gmail",
@@ -119,24 +119,23 @@ module.exports.resetPassword = async (req, res) => {
             resetTokenExpire: { $gt: Date.now() } 
         });
 
-       
+        if (!user) {
+            return res.status(400).json({ message: "Invalid or expired token" });
+        }
 
         // Validate new password
-        if (!newpassword ) {
+        if (!newpassword || newpassword.length < 6) {
             return res.status(400).json({ message: "Password must be at least 6 characters long" });
         }
 
         // Hash the new password before saving
-        
-      user.password= await  newpassword
-    
+        user.password = await bcrypt.hash(newpassword, 10);
 
-       
         user.resetToken = null;
         user.resetTokenExpire = null;
 
-        // Save the updated user in the database
-        await user.save();
+        // Save the updated user in the database, skip validation for required fields
+        await user.save({ validateBeforeSave: false });
 
         res.status(200).json({ message: "Password reset successfully" });
     } catch (err) {

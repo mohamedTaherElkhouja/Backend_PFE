@@ -26,6 +26,11 @@ const userSchema = new mongoose.Schema({
     ref:"Role"
     
   },
+  service: 
+  {
+    type: String,
+    required: true,
+  },
   verificationToken:{
     type:String
 
