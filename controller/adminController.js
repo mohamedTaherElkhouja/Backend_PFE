@@ -7,9 +7,8 @@ const bcrypt=  require ('bcrypt');
 module.exports.createAdmin = async(req, res) => {
     try {
       const { email, password } = req.body;
-      const hashed = await bcrypt.hash(password, 10);
-      const admin = new Admin({ email, password: hashed });
-      
+      // No hashing, store password as plain text (not secure)
+      const admin = new Admin({ email, password });
       await admin.save();
       res.status(201).json({ message: 'Utilisateur créé avec succès', admin });
     } catch (err) {
