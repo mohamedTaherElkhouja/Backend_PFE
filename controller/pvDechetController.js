@@ -331,27 +331,31 @@ exports.getPvDechetsForAQ = async (req, res) => {
         res.status(500).json({ message: "Erreur serveur", error: error.message });
     }
 };
-exports.validatePvByAQ = async (req, res) => {
+ exports.validatePvByAQ = async (req, res) => {
     const { pvDechetId } = req.params;
-    const { AQ_Commentaire, AQ_Quantite_Avant, AQ_Quantite_Apres } = req.body;
+    const { AQ_Commentaire, AQ_Quantite_Avant, AQ_Quantite_Apres , userId } = req.body;
+
+    // Use the authenticated user from the token
+    const user = await User.findById(userId).populate("roleId");
+    if (!user || user.roleId.nameRole !== "AQ") {
+        return res.status(403).json({ message: "Accès refusé. Vous devez être AQ pour valider ce PV." });
+    }
 
     try {
-        // Find the PvDechet by ID
         const dechet = await PvDechet.findById(pvDechetId);
         if (!dechet) {
             return res.status(404).json({ message: "PV non trouvé" });
         }
 
-        // Apply changes
         dechet.AQ_Commentaire = AQ_Commentaire;
         dechet.AQ_Quantite_Avant = AQ_Quantite_Avant;
         dechet.AQ_Quantite_Apres = AQ_Quantite_Apres;
         dechet.AQ_Validated = true;
         dechet.statut = "valider";
+        dechet.AQ_User = req.user._id;
+        
 
         await dechet.save();
-
-        // Notify HSE by email
         await notifyHSE(dechet);
 
         res.status(200).json({ message: "PV validé avec succès par AQ", data: dechet });
@@ -360,6 +364,7 @@ exports.validatePvByAQ = async (req, res) => {
         res.status(500).json({ message: "Erreur serveur", error: error.message });
     }
 };
+
 
 async function notifyHSE(pvDechet) {
     try {
@@ -434,7 +439,7 @@ exports.validatePvByHSE = async (req, res) => {
         // Apply changes
         dechet.HSE_Commentaire = HSE_Commentaire;
         dechet.HSE_Validated = true;
-        
+        dechet.HSE_User = req.user._id; // Assuming req.user contains the authenticated user
 
         await dechet.save();
 
@@ -447,7 +452,8 @@ exports.validatePvByHSE = async (req, res) => {
 
 exports.getPvDechetsForHSE = async (req, res) => {
     try {
-        const pvList = await PvDechet.find({ statut: "valider", HSE_Validated: { $ne: false } });
+        // PVs validated by AQ but not yet by HSE
+        const pvList = await PvDechet.find({ statut: "valider", AQ_Validated: true, HSE_Validated: false });
 
         if (!pvList || pvList.length === 0) {
             return res.status(404).json({ message: "Aucun PV disponible pour HSE" });
@@ -473,4 +479,151 @@ exports.getValidatedPvByHSE = async (req, res) => {
         console.error(error);
         res.status(500).json({ message: "Erreur serveur", error: error.message });
     }
+};
+const PDFDocument = require('pdfkit');
+const pv_Dechet = require('../model/pvDechetModel');
+const userToken = require("../model/userToken");
+
+
+exports.generateDechetPdf = async (req, res) => {
+    const { pvDechetId } = req.params;
+
+    if (!pvDechetId) {
+        return res.status(400).json({ message: "Missing pvDechetId in request body" });
+    }
+
+    // Populate AQ_User and HSE_User to get their names directly
+    const pv = await pv_Dechet.findById(pvDechetId)
+        .populate('Id_User', 'name firstName roleId')
+        .populate('Nature_Dechet', 'type_Categorie')
+        .populate('AQ_User', 'name firstName roleId')
+        .populate('HSE_User', 'name firstName roleId');
+
+    if (!pv) {
+        return res.status(404).json({ message: "PV Dechet not found" });
+    }
+
+    // Get AQ and HSE names if available
+    const aqName = pv.AQ_User ? `${pv.AQ_User.firstName || ''} ${pv.AQ_User.name || ''}`.trim() : 'Non validé';
+    const hseName = pv.HSE_User ? `${pv.HSE_User.firstName || ''} ${pv.HSE_User.name || ''}`.trim() : 'Non validé';
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    let buffers = [];
+
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+        const pdfData = Buffer.concat(buffers);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=dechet.pdf');
+        res.send(pdfData);
+    });
+
+    // Header
+    doc.rect(0, 0, doc.page.width, 40).fill('#2E86C1');
+    doc
+        .fillColor('#fff')
+        .fontSize(18)
+        .font('Helvetica-Bold')
+        .text('Rapport de Déchet', 40, 15, { align: 'left' });
+
+    doc.moveDown(0.7);
+
+    // Informations Générales
+    doc
+        .fillColor('#222')
+        .fontSize(13)
+        .font('Helvetica-Bold')
+        .text('Informations Générales', { underline: true });
+    doc.moveDown(0.3);
+
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Date de création : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Date_Creation?.toLocaleDateString() || ''}`);
+    doc.fillColor('#444').text(`Émetteur : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Id_User?.firstName || ''} ${pv.Id_User?.name || ''}`);
+    doc.fillColor('#444').text(`Nature du déchet : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Nature_Dechet?.type_Categorie || ''}`);
+    doc.fillColor('#444').text(`Type de déchet : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Type_Dechet}`);
+    doc.fillColor('#444').text(`Service émetteur : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Service_Emetteur}`);
+    doc.fillColor('#444').text(`Désignation : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Designation}`);
+    doc.fillColor('#444').text(`Quantité : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Quantite}`);
+    doc.fillColor('#444').text(`Numéro de lot : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Num_lot}`);
+    doc.fillColor('#444').text(`Motif de rejet : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Motif_Rejet}`);
+    doc.fillColor('#444').text(`Commentaire : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Commentaire}`);
+    doc.fillColor('#444').text(`Statut : `, { continued: true })
+        .fillColor(pv.statut === 'valider' ? '#27AE60' : '#E67E22')
+        .text(`${pv.statut}`);
+
+    // Séparateur
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
+    doc.moveDown(0.5);
+
+    // Validations
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#2E86C1')
+        .text('Validations', { underline: true });
+    doc.moveDown(0.2);
+
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Émetteur : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Id_User?.firstName || ''} ${pv.Id_User?.name || ''}`);
+    doc.fillColor('#444').text(`Validé par AQ : `, { continued: true }).fillColor('#000')
+        .text(aqName);
+    doc.fillColor('#444').text(`Validé par HSE : `, { continued: true }).fillColor('#000')
+        .text(hseName);
+
+    // Séparateur
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
+    doc.moveDown(0.5);
+
+    // AQ Section
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#117A65')
+        .text('Assurance Qualité');
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Nom AQ : `, { continued: true }).fillColor('#000')
+        .text(aqName);
+    doc.fillColor('#444').text(`Commentaire : `, { continued: true }).fillColor('#000')
+        .text(`${pv.AQ_Commentaire || ''}`);
+    doc.fillColor('#444').text(`Quantité avant : `, { continued: true }).fillColor('#000')
+        .text(`${pv.AQ_Quantite_Avant || ''}`);
+    doc.fillColor('#444').text(`Quantité après : `, { continued: true }).fillColor('#000')
+        .text(`${pv.AQ_Quantite_Apres || ''}`);
+    doc.fillColor('#444').text(`Validé : `, { continued: true })
+        .fillColor(pv.AQ_Validated ? '#27AE60' : '#E74C3C')
+        .text(`${pv.AQ_Validated ? 'Oui' : 'Non'}`);
+
+    // Séparateur
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
+    doc.moveDown(0.5);
+
+    // HSE Section
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#B9770E')
+        .text('HSE');
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Nom HSE : `, { continued: true }).fillColor('#000')
+        .text(hseName);
+    doc.fillColor('#444').text(`Commentaire : `, { continued: true }).fillColor('#000')
+        .text(`${pv.HSE_Commentaire || ''}`);
+    doc.fillColor('#444').text(`Validé : `, { continued: true })
+        .fillColor(pv.HSE_Validated ? '#27AE60' : '#E74C3C')
+        .text(`${pv.HSE_Validated ? 'Oui' : 'Non'}`);
+
+    // Footer
+    doc.moveDown(0.7);
+    doc.fontSize(8).fillColor('#bbb')
+        .text('Document généré automatiquement - ' + new Date().toLocaleString(), 40, doc.page.height - 50, {
+            align: 'center',
+            width: doc.page.width - 80
+        });
+
+    doc.end();
 };

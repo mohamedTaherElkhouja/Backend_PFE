@@ -9,5 +9,6 @@ router.get("/countUsersByRole/:roleId",adminController.countUsersByRole)
 router.get("/countUsers",adminController.countUsers)
 router.delete("/deleteUser/:id",adminController.deleteUser)
 router.get("/getDechetCount",adminController.countPvDechet)
-router.put("/update/:id",adminController.UpdateProfileAdmin)
+router.put("/update/:adminId",adminController.UpdateProfileAdmin)
+router.post("/CreateUser",adminController.createUser)
 module.exports=router

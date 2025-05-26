@@ -3,6 +3,7 @@ const JWT = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+
 require("dotenv").config();
 
 // LOGIN
@@ -10,19 +11,27 @@ module.exports.Login = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const admin = await Admin.findOne({ email });
+        // Explicitly select the password field
+        const admin = await Admin.findOne({ email }).select('+password');
+        console.log("Admin with password:", admin);
+
 
         if (!admin) {
             return res.status(401).json({ message: "Email not found" });
         }
 
         const isValidPassword = await bcrypt.compare(password, admin.password);
+        console.log("Provided password:", password);
+        console.log("Stored hash:", admin.password);
+        console.log("Is valid password:", isValidPassword);
+        
+
         if (!isValidPassword) {
             return res.status(401).json({ message: "Invalid password" });
         }
 
         const token = JWT.sign(
-            { adminId: admin._id }, // No need to send more data unless needed
+            { adminId: admin._id },
             process.env.TOKEN_SECRET,
             { expiresIn: "1h" }
         );
@@ -57,4 +66,3 @@ module.exports.verifyToken = (req, res, next) => {
 };
 
 // FORGET PASSWORD
-

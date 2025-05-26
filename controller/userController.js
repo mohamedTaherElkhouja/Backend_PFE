@@ -2,7 +2,7 @@ const User= require("../model/userModel")
 const Role= require("../model/roleModel")
 const bcrypt = require("bcrypt");
 module.exports.addUser = async (req, res) => {
-    const { name, firstName, email, password,roleId } = req.body;
+    const { name, firstName, service ,  email, password,roleId } = req.body;
     
 
     try {
@@ -22,7 +22,8 @@ module.exports.addUser = async (req, res) => {
             firstName,
             email,
             password,
-            roleId:role._id
+            roleId:role._id,
+            service
         });
 
         await user.save();
