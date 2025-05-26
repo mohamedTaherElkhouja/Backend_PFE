@@ -486,139 +486,144 @@ const userToken = require("../model/userToken");
 
 
 exports.generateDechetPdf = async (req, res) => {
-  const { pvDechetId } = req.params;
+    const { pvDechetId } = req.params;
 
-  if (!pvDechetId) {
-    return res.status(400).json({ message: "Missing pvDechetId in request body" });
-  }
+    if (!pvDechetId) {
+        return res.status(400).json({ message: "Missing pvDechetId in request body" });
+    }
 
-  const pv = await pv_Dechet.findById(pvDechetId)
-    .populate('Id_User', 'name firstName email roleId')
-    .populate('Nature_Dechet', 'type_Categorie');
+    // Populate AQ_User and HSE_User to get their names directly
+    const pv = await pv_Dechet.findById(pvDechetId)
+        .populate('Id_User', 'name firstName roleId')
+        .populate('Nature_Dechet', 'type_Categorie')
+        .populate('AQ_User', 'name firstName roleId')
+        .populate('HSE_User', 'name firstName roleId');
 
-  if (!pv) {
-    return res.status(404).json({ message: "PV Dechet not found" });
-  }
+    if (!pv) {
+        return res.status(404).json({ message: "PV Dechet not found" });
+    }
 
-  const AQ_ROLE_ID = "67ccb0a866312e8af97a1f3e";
-  const HSE_ROLE_ID = "67ccb0ae66312e8af97a1f41";
-  const aqUser = await User.findOne({ roleId: AQ_ROLE_ID });
-  const hseUser = await User.findOne({ roleId: HSE_ROLE_ID });
+    // Get AQ and HSE names if available
+    const aqName = pv.AQ_User ? `${pv.AQ_User.firstName || ''} ${pv.AQ_User.name || ''}`.trim() : 'Non validé';
+    const hseName = pv.HSE_User ? `${pv.HSE_User.firstName || ''} ${pv.HSE_User.name || ''}`.trim() : 'Non validé';
 
-  const doc = new PDFDocument({ margin: 40, size: 'A4' });
-  let buffers = [];
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    let buffers = [];
 
-  doc.on('data', buffers.push.bind(buffers));
-  doc.on('end', () => {
-    const pdfData = Buffer.concat(buffers);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=dechet.pdf');
-    res.send(pdfData);
-  });
-
-  // Header
-  doc.rect(0, 0, doc.page.width, 40).fill('#2E86C1');
-  doc
-    .fillColor('#fff')
-    .fontSize(18)
-    .font('Helvetica-Bold')
-    .text('Rapport de Déchet', 40, 15, { align: 'left' });
-
-  doc.moveDown(0.7);
-
-  // Informations Générales
-  doc
-    .fillColor('#222')
-    .fontSize(13)
-    .font('Helvetica-Bold')
-    .text('Informations Générales', { underline: true });
-  doc.moveDown(0.3);
-
-  doc.fontSize(10).font('Helvetica').fillColor('#444')
-    .text(`Date de création : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Date_Creation?.toLocaleDateString() || ''}`);
-  doc.fillColor('#444').text(`Émetteur : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Id_User?.firstName || ''} ${pv.Id_User?.name || ''}`);
-  doc.fillColor('#444').text(`Nature du déchet : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Nature_Dechet?.type_Categorie || ''}`);
-  doc.fillColor('#444').text(`Type de déchet : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Type_Dechet}`);
-  doc.fillColor('#444').text(`Service émetteur : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Service_Emetteur}`);
-  doc.fillColor('#444').text(`Désignation : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Designation}`);
-  doc.fillColor('#444').text(`Quantité : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Quantite}`);
-  doc.fillColor('#444').text(`Numéro de lot : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Num_lot}`);
-  doc.fillColor('#444').text(`Motif de rejet : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Motif_Rejet}`);
-  doc.fillColor('#444').text(`Commentaire : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Commentaire}`);
-  doc.fillColor('#444').text(`Statut : `, { continued: true })
-    .fillColor(pv.statut === 'valider' ? '#27AE60' : '#E67E22')
-    .text(`${pv.statut}`);
-
-  // Séparateur
-  doc.moveDown(0.5);
-  doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
-  doc.moveDown(0.5);
-
-  // Validations
-  doc.fontSize(12).font('Helvetica-Bold').fillColor('#2E86C1')
-    .text('Validations', { underline: true });
-  doc.moveDown(0.2);
-
-  doc.fontSize(10).font('Helvetica').fillColor('#444')
-    .text(`Émetteur : `, { continued: true }).fillColor('#000')
-    .text(`${pv.Id_User?.firstName || ''} ${pv.Id_User?.name || ''}`);
-  doc.fillColor('#444').text(`Validé par AQ : `, { continued: true }).fillColor('#000')
-    .text(`${aqUser ? aqUser.firstName + ' ' + aqUser.name : 'Non validé'}`);
-  doc.fillColor('#444').text(`Validé par HSE : `, { continued: true }).fillColor('#000')
-    .text(`${hseUser ? hseUser.firstName + ' ' + hseUser.name : 'Non validé'}`);
-
-  // Séparateur
-  doc.moveDown(0.5);
-  doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
-  doc.moveDown(0.5);
-
-  // AQ Section
-  doc.fontSize(11).font('Helvetica-Bold').fillColor('#117A65')
-    .text('Assurance Qualité');
-  doc.fontSize(10).font('Helvetica').fillColor('#444')
-    .text(`Commentaire : `, { continued: true }).fillColor('#000')
-    .text(`${pv.AQ_Commentaire || ''}`);
-  doc.fillColor('#444').text(`Quantité avant : `, { continued: true }).fillColor('#000')
-    .text(`${pv.AQ_Quantite_Avant || ''}`);
-  doc.fillColor('#444').text(`Quantité après : `, { continued: true }).fillColor('#000')
-    .text(`${pv.AQ_Quantite_Apres || ''}`);
-  doc.fillColor('#444').text(`Validé : `, { continued: true })
-    .fillColor(pv.AQ_Validated ? '#27AE60' : '#E74C3C')
-    .text(`${pv.AQ_Validated ? 'Oui' : 'Non'}`);
-
-  // Séparateur
-  doc.moveDown(0.5);
-  doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
-  doc.moveDown(0.5);
-
-  // HSE Section
-  doc.fontSize(11).font('Helvetica-Bold').fillColor('#B9770E')
-    .text('HSE');
-  doc.fontSize(10).font('Helvetica').fillColor('#444')
-    .text(`Commentaire : `, { continued: true }).fillColor('#000')
-    .text(`${pv.HSE_Commentaire || ''}`);
-  doc.fillColor('#444').text(`Validé : `, { continued: true })
-    .fillColor(pv.HSE_Validated ? '#27AE60' : '#E74C3C')
-    .text(`${pv.HSE_Validated ? 'Oui' : 'Non'}`);
-
-  // Footer
-  doc.moveDown(0.7);
-  doc.fontSize(8).fillColor('#bbb')
-    .text('Document généré automatiquement - ' + new Date().toLocaleString(), 40, doc.page.height - 50, {
-      align: 'center',
-      width: doc.page.width - 80
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => {
+        const pdfData = Buffer.concat(buffers);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=dechet.pdf');
+        res.send(pdfData);
     });
 
-  doc.end();
-};
+    // Header
+    doc.rect(0, 0, doc.page.width, 40).fill('#2E86C1');
+    doc
+        .fillColor('#fff')
+        .fontSize(18)
+        .font('Helvetica-Bold')
+        .text('Rapport de Déchet', 40, 15, { align: 'left' });
 
+    doc.moveDown(0.7);
+
+    // Informations Générales
+    doc
+        .fillColor('#222')
+        .fontSize(13)
+        .font('Helvetica-Bold')
+        .text('Informations Générales', { underline: true });
+    doc.moveDown(0.3);
+
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Date de création : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Date_Creation?.toLocaleDateString() || ''}`);
+    doc.fillColor('#444').text(`Émetteur : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Id_User?.firstName || ''} ${pv.Id_User?.name || ''}`);
+    doc.fillColor('#444').text(`Nature du déchet : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Nature_Dechet?.type_Categorie || ''}`);
+    doc.fillColor('#444').text(`Type de déchet : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Type_Dechet}`);
+    doc.fillColor('#444').text(`Service émetteur : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Service_Emetteur}`);
+    doc.fillColor('#444').text(`Désignation : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Designation}`);
+    doc.fillColor('#444').text(`Quantité : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Quantite}`);
+    doc.fillColor('#444').text(`Numéro de lot : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Num_lot}`);
+    doc.fillColor('#444').text(`Motif de rejet : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Motif_Rejet}`);
+    doc.fillColor('#444').text(`Commentaire : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Commentaire}`);
+    doc.fillColor('#444').text(`Statut : `, { continued: true })
+        .fillColor(pv.statut === 'valider' ? '#27AE60' : '#E67E22')
+        .text(`${pv.statut}`);
+
+    // Séparateur
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
+    doc.moveDown(0.5);
+
+    // Validations
+    doc.fontSize(12).font('Helvetica-Bold').fillColor('#2E86C1')
+        .text('Validations', { underline: true });
+    doc.moveDown(0.2);
+
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Émetteur : `, { continued: true }).fillColor('#000')
+        .text(`${pv.Id_User?.firstName || ''} ${pv.Id_User?.name || ''}`);
+    doc.fillColor('#444').text(`Validé par AQ : `, { continued: true }).fillColor('#000')
+        .text(aqName);
+    doc.fillColor('#444').text(`Validé par HSE : `, { continued: true }).fillColor('#000')
+        .text(hseName);
+
+    // Séparateur
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
+    doc.moveDown(0.5);
+
+    // AQ Section
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#117A65')
+        .text('Assurance Qualité');
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Nom AQ : `, { continued: true }).fillColor('#000')
+        .text(aqName);
+    doc.fillColor('#444').text(`Commentaire : `, { continued: true }).fillColor('#000')
+        .text(`${pv.AQ_Commentaire || ''}`);
+    doc.fillColor('#444').text(`Quantité avant : `, { continued: true }).fillColor('#000')
+        .text(`${pv.AQ_Quantite_Avant || ''}`);
+    doc.fillColor('#444').text(`Quantité après : `, { continued: true }).fillColor('#000')
+        .text(`${pv.AQ_Quantite_Apres || ''}`);
+    doc.fillColor('#444').text(`Validé : `, { continued: true })
+        .fillColor(pv.AQ_Validated ? '#27AE60' : '#E74C3C')
+        .text(`${pv.AQ_Validated ? 'Oui' : 'Non'}`);
+
+    // Séparateur
+    doc.moveDown(0.5);
+    doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke('#bbb');
+    doc.moveDown(0.5);
+
+    // HSE Section
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#B9770E')
+        .text('HSE');
+    doc.fontSize(10).font('Helvetica').fillColor('#444')
+        .text(`Nom HSE : `, { continued: true }).fillColor('#000')
+        .text(hseName);
+    doc.fillColor('#444').text(`Commentaire : `, { continued: true }).fillColor('#000')
+        .text(`${pv.HSE_Commentaire || ''}`);
+    doc.fillColor('#444').text(`Validé : `, { continued: true })
+        .fillColor(pv.HSE_Validated ? '#27AE60' : '#E74C3C')
+        .text(`${pv.HSE_Validated ? 'Oui' : 'Non'}`);
+
+    // Footer
+    doc.moveDown(0.7);
+    doc.fontSize(8).fillColor('#bbb')
+        .text('Document généré automatiquement - ' + new Date().toLocaleString(), 40, doc.page.height - 50, {
+            align: 'center',
+            width: doc.page.width - 80
+        });
+
+    doc.end();
+};

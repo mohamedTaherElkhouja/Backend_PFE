@@ -1,5 +1,6 @@
 const User= require("../model/userModel")
 const Role= require("../model/roleModel")
+const bcrypt = require("bcrypt");
 module.exports.addUser = async (req, res) => {
     const { name, firstName, service ,  email, password,roleId } = req.body;
     
@@ -75,28 +76,34 @@ module.exports.deleteUser=async(req,res)=>{
 
 
 }
-module.exports.updateUser=async(req,res)=>{
-    try{
-        const {userId}=req.params
-        const {name,firstName,email,password}=req.body
-        if(!userId){
-            res.status(400).json({message:"not found"})
+module.exports.updateUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { name, firstName, email, password } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({ message: "not found" });
         }
-        const updateUser= await User.findByIdAndUpdate(userId,{name,firstName,email,password})
-        if (!updateUser){
-            res.status(404).json({message:"user not found"})
 
+        let updateFields = { name, firstName, email };
+
+        // Only hash and update password if provided
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            updateFields.password = await bcrypt.hash(password, salt);
         }
-        res.status(201).json({message:"updated successfully"})
 
-        
+        const updateUser = await User.findByIdAndUpdate(userId, updateFields);
 
+        if (!updateUser) {
+            return res.status(404).json({ message: "user not found" });
+        }
+
+        res.status(201).json({ message: "updated successfully" });
+    } catch (err) {
+        console.log(err);
+        res.status(500).json("error in server");
     }
-    catch(err){
-        console.log(err)
-        res.status(500).json("error in server")
-    }
-
 }
 module.exports.getAllUsers=async(req,res)=>{
     try{

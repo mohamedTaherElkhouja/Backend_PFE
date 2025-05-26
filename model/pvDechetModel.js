@@ -19,13 +19,12 @@ const pvDechetSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
-    
     AQ_Commentaire: { type: String },
     AQ_Quantite_Avant: { type: Number },
     AQ_Quantite_Apres: { type: Number },
     AQ_Validated: { type: Boolean, default: false },
-    
-     
+    AQ_User : {type: mongoose.Schema.Types.ObjectId, ref: "User", Option: true},
+    HSE_User: { type: mongoose.Schema.Types.ObjectId, ref: "User", Option: true },
     HSE_Commentaire: { type: String },
     HSE_Validated: { type: Boolean, default: false },
   
